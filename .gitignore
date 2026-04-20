@@ -1,33 +1,65 @@
-# Python
+# 🔹 Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
 
-# Virtual environments
+# 🔹 Virtual environments
 venv/
+.env/
+.envs/
 .venv/
+env/
+ENV/
 
-# Environment variables
+# 🔹 Environment variables
 .env
 *.env
 
-# IDE
-.vscode/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Logs
+# 🔹 Logs
 *.log
 
-# Databases / cache
-*.sqlite3
-*.db
-*.cache
-
-# Build files
+# 🔹 Build / distribution
 build/
 dist/
 *.egg-info/
+.eggs/
+
+# 🔹 Jupyter Notebook
+.ipynb_checkpoints/
+
+# 🔹 VS Code
+.vscode/
+
+# 🔹 PyCharm
+.idea/
+
+# 🔹 OS files
+.DS_Store
+Thumbs.db
+
+# 🔹 Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 🔹 ML / AI stuff
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.onnx
+
+# 🔹 Database
+*.db
+*.sqlite3
+
+# 🔹 FastAPI / backend temp
+*.jsonl
+
+# 🔹 Node (if using frontend)
+node_modules/
+dist/
+
+# 🔹 Docker
+*.tar

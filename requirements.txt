@@ -1,0 +1,7 @@
+uvicorn
+pydantic
+supabase
+python-dotenv
+gotrue
+postgrest
+realtime
