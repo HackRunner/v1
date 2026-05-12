@@ -1,11 +1,14 @@
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 from app.supabase_client import supabase
-from app.logger import LOG_FILE, read_logs
 from app.model import generate_mcq
 from app.utils import extract_json, validate_mcq
 from app.logger import LOG_FILE, read_logs, log_entry  # add log_entry here
 router = APIRouter()
+
+from app.model import generate_short_answer
+from app.utils import validate_short_answer
+
 
 BULK_GENERATE_MAX = 20
 
@@ -14,12 +17,15 @@ BULK_GENERATE_MAX = 20
 
 class RegenerateRequest(BaseModel):
     topic: str
-
+    question_type: str
 
 class BulkGenerateRequest(BaseModel):
     topic: str
     count: int = 5
+    question_type: str
 
+class ShortAnswerRequest(BaseModel):
+    topic: str
 
 # ── Log endpoints ─────────────────────────────────────────────────────────────
 
@@ -87,9 +93,22 @@ def regenerate(req: RegenerateRequest):
     Generate a single raw MCQ and return it alongside its validation result.
     Bypasses the retry loop intentionally — useful for inspecting raw model output.
     """
-    raw = generate_mcq(req.topic)
+    if req.question_type == "mcq":
+        raw = generate_mcq(req.topic)
+
+    elif req.question_type == "short_answer":
+        raw = generate_short_answer(req.topic)
+
+    else:
+        return {
+            "error": "Invalid question type"
+        }
     parsed = extract_json(raw)
-    is_valid, reason = validate_mcq(parsed)
+    if req.question_type == "mcq":
+        is_valid, reason = validate_mcq(parsed)
+
+    elif req.question_type == "short_answer":
+        is_valid, reason = validate_short_answer(parsed)
 
     return {
         **parsed,
@@ -107,21 +126,38 @@ def bulk_generate(req: BulkGenerateRequest):
     from app.supabase_client import supabase  # add this
 
     for _ in range(count):
-        raw = generate_mcq(req.topic)
-        parsed = extract_json(raw)
-        is_valid, reason = validate_mcq(parsed)
+        if req.question_type == "mcq":
+
+            raw = generate_mcq(req.topic)
+            parsed = extract_json(raw)
+            is_valid, reason = validate_mcq(parsed)
+
+        elif req.question_type == "short_answer":
+
+            raw = generate_short_answer(req.topic)
+            parsed = extract_json(raw)
+            is_valid, reason = validate_short_answer(parsed)
+
+        else:
+
+            continue
 
         db_status = "not_saved"
 
         if is_valid:
             try:
-                supabase.table("questions").insert({
-                    "topic": req.topic.lower(),
+                question_data = {
+                    "type": parsed.get("type"),
+                    "difficulty": parsed.get("difficulty"),
+                    "topic": parsed.get("topic"),
                     "question": parsed.get("question"),
                     "options": parsed.get("options"),
                     "correct_answer": parsed.get("correct_answer"),
+                    "answer": parsed.get("answer"),
                     "explanation": parsed.get("explanation")
-                }).execute()
+                }
+
+                supabase.table("questions").insert(question_data).execute()
                 db_status = "saved"
                 log_entry("accepted", req.topic, parsed)         # add this
             except Exception as e:
@@ -186,3 +222,20 @@ def get_feedback():
         return res.data
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to fetch feedback")
+    
+@router.post("/generate-short-answer")
+def generate_short(req: ShortAnswerRequest):
+
+    raw = generate_short_answer(req.topic)
+
+    parsed = extract_json(raw)
+
+    is_valid, reason = validate_short_answer(parsed)
+
+    return {
+        **parsed,
+        "validation": {
+            "passed": is_valid,
+            "failed_check": reason
+        }
+    }

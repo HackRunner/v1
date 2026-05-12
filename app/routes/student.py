@@ -8,6 +8,25 @@ from app.supabase_client import supabase
 
 router = APIRouter()
 
+import re
+
+def normalize_answer(text: str):
+
+    text = text.lower().strip()
+
+    text = re.sub(
+        r"[^a-z0-9\s]",
+        "",
+        text
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
+
+    return text
 
 # ─────────────────────────────────────────────
 # 📥 Request Models
@@ -16,12 +35,12 @@ router = APIRouter()
 class QuestionRequest(BaseModel):
     user_id: str
     topic: str
-
+    question_type: str
 
 class SubmitRequest(BaseModel):
     user_id: str
     question_id: str
-    selected_answer: Literal["A", "B", "C", "D"]
+    selected_answer: str
 
 
 class FeedbackRequest(BaseModel):
@@ -46,6 +65,7 @@ def get_question(req: QuestionRequest):
         res = supabase.table("questions") \
             .select("*") \
             .ilike("topic", f"%{req.topic.lower()}%") \
+            .eq("type", req.question_type) \
             .execute()
 
         if not res.data:
@@ -69,8 +89,9 @@ def get_question(req: QuestionRequest):
 
         return {
             "question_id": q["id"],
+            "type": q["type"],
             "question": q["question"],
-            "options": q["options"]
+            "options": q.get("options"),
         }
 
     except HTTPException:
@@ -97,23 +118,81 @@ def submit_answer(req: SubmitRequest):
         raise HTTPException(status_code=404, detail="Question not found")
 
     question = q.data[0]
-    correct_answer = question["correct_answer"]
-    is_correct = req.selected_answer == correct_answer
+    question_type = (
+        question["type"]
+        .strip()
+        .lower()
+    )
+
+    if question_type == "mcq":
+        correct_answer = (
+            question["correct_answer"]
+        )
+
+        is_correct = (
+            req.selected_answer
+            .strip()
+            .upper()
+            ==
+            correct_answer
+            .strip()
+            .upper()
+        )
+
+    elif question_type == "short_answer":
+        correct_answer = (
+            question.get("answer")
+        )
+
+        if not correct_answer:
+            raise HTTPException(
+                status_code=500,
+                detail="Question answer missing"
+            )
+
+        user_answer = normalize_answer(
+            req.selected_answer
+        )
+
+        expected_answer = normalize_answer(
+            correct_answer
+        )
+
+        is_correct = (
+            user_answer
+            ==
+            expected_answer
+        )
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported question type: {question_type}"
+        )
 
     try:
-        supabase.table("attempts").insert({
+        attempt_data = {
             "student_id": req.user_id,
             "question_id": req.question_id,
-            "selected_answer": req.selected_answer,
             "is_correct": is_correct
-        }).execute()
+        }
+
+        if question_type == "mcq":
+            attempt_data["selected_answer"] = req.selected_answer
+
+        elif question_type == "short_answer":
+            attempt_data["text_answer"] = req.selected_answer
+
+        supabase.table("attempts").insert(attempt_data).execute()
 
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to store attempt")
 
     return {
+        "type": question_type,
         "correct": is_correct,
         "correct_answer": correct_answer,
+        "your_answer": req.selected_answer,
         "explanation": question["explanation"]
     }
 

@@ -290,6 +290,51 @@ header::after {
 .form-select option { background: var(--surface2); }
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
+.form-select {
+
+  width: 100%;
+
+  background: var(--surface2);
+
+  border: 1px solid var(--border);
+
+  color: var(--text);
+
+  padding: 12px 14px;
+
+  font-size: 13px;
+
+  font-family:
+    'JetBrains Mono',
+    monospace;
+
+  outline: none;
+
+  transition: all 0.25s ease;
+
+  appearance: none;
+
+  cursor: pointer;
+}
+
+.form-select:focus {
+
+  border-color: var(--accent);
+
+  background: var(--surface3);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(0,255,136,0.06);
+}
+
+.form-select option {
+
+  background: #0b1020;
+
+  color: white;
+}
+
 /* ── BUTTONS ── */
 .btn {
   padding: 11px 26px;
@@ -497,6 +542,29 @@ header::after {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+.short-answer-box {
+  margin-top: 18px;
+}
+
+.short-answer-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  padding: 12px 14px;
+  outline: none;
+  transition: all 0.25s;
+}
+
+.short-answer-input:focus {
+  border-color: var(--accent);
+  background: var(--surface3);
+  box-shadow: 0 0 0 3px rgba(0,255,136,0.06);
+}
+
 .mcq-warning {
   padding: 10px 14px;
   background: rgba(245,158,11,0.07);
@@ -1008,13 +1076,35 @@ header::after {
       <div class="section-label">Generate Question</div>
       <div class="card">
         <div class="form-grid-2">
+
           <div class="form-group">
             <label class="form-label">Topic</label>
-            <input class="form-input" id="q-topic" placeholder="e.g. SQL Injection, XSS, Firewalls"/>
+            <input
+              class="form-input"
+              id="q-topic"
+              placeholder="e.g. SQL Injection, XSS, Firewalls"
+            />
           </div>
-          <div style="display:flex;align-items:flex-end">
-            <button class="btn btn-primary" onclick="getQuestion(event)" id="gen-btn">▶ Generate</button>
+
+          <div class="form-group">
+            <label class="form-label">Question Type</label>
+            <div style="display:flex;gap:0;border:1px solid var(--border);width:fit-content;overflow:hidden">
+              <button class="qtype-btn" id="qtype-mcq" onclick="setQuestionType('mcq',this)" style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:10px 22px;border:none;border-right:1px solid var(--border);cursor:pointer;transition:all 0.2s;background:rgba(0,255,136,0.08);color:var(--accent)">MCQ</button>
+              <button class="qtype-btn" id="qtype-short" onclick="setQuestionType('short_answer',this)" style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:10px 22px;border:none;cursor:pointer;transition:all 0.2s;background:transparent;color:var(--muted)">Short Answer</button>
+            </div>
+            <input type="hidden" id="question-type" value="mcq"/>
           </div>
+
+        </div>
+
+        <div style="margin-top:16px">
+          <button
+            class="btn btn-primary"
+            onclick="getQuestion(event)"
+            id="gen-btn"
+          >
+            ▶ Generate
+          </button>
         </div>
       </div>
       <div id="mcq-area" style="display:none">
@@ -1243,6 +1333,14 @@ header::after {
             <input class="form-input" id="bulk-count" type="number" min="1" max="20" value="5"/>
           </div>
         </div>
+        <div class="form-group" style="margin-top:4px">
+          <label class="form-label">Question Type</label>
+          <div style="display:flex;gap:0;border:1px solid var(--border);width:fit-content;overflow:hidden">
+            <button class="bulk-type-btn active" id="bulk-type-mcq" onclick="setBulkType('mcq',this)" style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:8px 20px;border:none;border-right:1px solid var(--border);cursor:pointer;transition:all 0.2s;background:rgba(0,255,136,0.08);color:var(--accent)">MCQ</button>
+            <button class="bulk-type-btn" id="bulk-type-short" onclick="setBulkType('short_answer',this)" style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:8px 20px;border:none;cursor:pointer;transition:all 0.2s;background:transparent;color:var(--muted)">Short Answer</button>
+          </div>
+          <input type="hidden" id="bulk-question-type" value="mcq"/>
+        </div>
         <button class="btn btn-primary" onclick="doBulkGenerate()" id="bulk-btn">▶ Generate Batch</button>
       </div>
       <div id="bulk-results"></div>
@@ -1299,6 +1397,7 @@ let currentUser = null;
 let currentQuestionId = null;
 let currentAnswered = false;
 let selectedOption = null;
+let currentQuestionType = "mcq";
 
 /* ══════════════════════════════════════════
    BACKGROUND CANVAS — animated grid + particles
@@ -1933,6 +2032,7 @@ function devTab(tab) {
 ═══════════════════════════════════════════ */
 async function getQuestion(e) {
   const topic = document.getElementById('q-topic').value.trim();
+  const questionType = document.getElementById('question-type').value;
   if (!topic) { toast('Enter a topic', true); return; }
   if (e) burst(e);
   const uid = currentUser?.user_id;
@@ -1947,9 +2047,11 @@ async function getQuestion(e) {
     mcqArea.style.display = 'none'; mcqArea.style.opacity = ''; mcqArea.style.transform = '';
   }
   try {
-    const data = await api('POST', '/student/question', { user_id: uid || 'guest', topic });
+    const data = await api('POST', '/student/question', { user_id: uid || 'guest', topic, question_type: questionType });
     currentQuestionId = data.question_id;
-    renderMCQ(data);
+    currentQuestionType = data.type || questionType;
+    if (currentQuestionType === 'short_answer') renderShortAnswer(data);
+    else renderMCQ(data);
     mcqArea.style.display = 'block';
     toast('Question loaded!');
   } catch(err) { toast(err.message, true); }
@@ -1975,6 +2077,85 @@ function renderMCQ(data) {
   container.innerHTML = html;
 }
 
+function renderShortAnswer(data) {
+
+  const container =
+    document.getElementById(
+      'mcq-display'
+    );
+
+  let html = '';
+
+  if (data.warnings) {
+
+    html += `
+      <div class="mcq-warning">
+        ⚠ ${data.warnings}
+      </div>
+    `;
+  }
+
+  html += `
+
+    <div class="mcq-question">
+      ${data.question}
+    </div>
+
+    <div class="short-answer-box">
+
+      <input
+        type="text"
+        id="short-answer-input"
+        class="short-answer-input"
+        placeholder="Type your answer..."
+        maxlength="120"
+      />
+
+    </div>
+
+    <button
+      class="btn btn-primary btn-sm"
+      id="submit-short-btn"
+      onclick="submitShortAnswer(event)"
+      style="
+        margin-top:18px;
+        margin-bottom:14px;
+      "
+    >
+
+      Submit Answer
+
+    </button>
+
+    <div
+      class="mcq-explanation"
+      id="short-answer-exp"
+    ></div>
+  `;
+
+  container.innerHTML = html;
+}
+
+function renderShortAnswer(data) {
+  const container = document.getElementById('mcq-display');
+  let html = '';
+  html += `<div class="mcq-question">${data.question}</div>`;
+  html += `<div style="margin:16px 0;animation:rowIn 0.4s cubic-bezier(0.4,0,0.2,1) 60ms both;opacity:0">`;
+  html += `<label class="form-label">Your Answer</label>`;
+  html += `<input class="form-input" id="short-ans-input" placeholder="Type your answer here..." autocomplete="off" style="margin-bottom:0"/>`;
+  html += `</div>`;
+  html += `<button class="btn btn-primary btn-sm" id="submit-ans-btn" onclick="submitAnswer(event)" style="margin-bottom:14px;animation:statCardIn 0.4s cubic-bezier(0.34,1.56,0.64,1) 180ms both;opacity:0">Submit Answer</button>`;
+  html += `<div class="mcq-explanation" id="mcq-exp"></div>`;
+  container.innerHTML = html;
+  // Focus input after animation
+  setTimeout(() => { const inp = document.getElementById('short-ans-input'); if (inp) inp.focus(); }, 200);
+  // Allow Enter to submit
+  setTimeout(() => {
+    const inp = document.getElementById('short-ans-input');
+    if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') submitAnswer(e); });
+  }, 100);
+}
+
 function selectOption(label) {
   if (currentAnswered) return;
   selectedOption = label;
@@ -1987,27 +2168,157 @@ function selectOption(label) {
 }
 
 async function submitAnswer(e) {
-  if (!selectedOption) { toast('Select an option first', true); return; }
   if (currentAnswered) return;
   if (!currentQuestionId) { toast('No question loaded', true); return; }
+
+  let answerToSubmit;
+  if (currentQuestionType === 'short_answer') {
+    const inp = document.getElementById('short-ans-input');
+    answerToSubmit = inp ? inp.value.trim() : '';
+    if (!answerToSubmit) { toast('Type your answer first', true); return; }
+    if (inp) inp.disabled = true;
+  } else {
+    if (!selectedOption) { toast('Select an option first', true); return; }
+    answerToSubmit = selectedOption;
+  }
+
   if (e) burst(e);
   const uid = currentUser?.user_id || 'guest';
   try {
-    const data = await api('POST', '/student/submit', { user_id: uid, question_id: currentQuestionId, selected_answer: selectedOption });
+    const data = await api('POST', '/student/submit', { user_id: uid, question_id: currentQuestionId, selected_answer: answerToSubmit });
     currentAnswered = true;
-    document.getElementById('mcq-exp').textContent = data.explanation;
-    const correct = data.correct_answer;
-    document.querySelectorAll('.mcq-option').forEach(el => {
-      const lbl = el.id.replace('opt-','');
-      if (lbl === correct) el.classList.add('correct');
-      else if (lbl === selectedOption && !data.correct) el.classList.add('wrong');
-    });
-    document.getElementById('mcq-exp').classList.add('show');
+
+    if (currentQuestionType === 'short_answer') {
+      const expEl = document.getElementById('mcq-exp');
+      const isCorrect = data.correct;
+      const resultHtml = `
+        <div style="margin-bottom:10px;padding:10px 14px;border:1px solid ${isCorrect ? 'rgba(0,255,136,0.3)' : 'rgba(239,68,68,0.3)'};background:${isCorrect ? 'rgba(0,255,136,0.05)' : 'rgba(239,68,68,0.05)'};animation:statCardIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:${isCorrect ? 'var(--accent)' : 'var(--danger)'};margin-bottom:6px">${isCorrect ? '✓ Correct!' : '✗ Incorrect'}</div>
+          ${!isCorrect ? `<div style="font-size:12px;color:var(--muted2);margin-bottom:4px">Correct answer: <span style="color:var(--accent)">${data.correct_answer}</span></div>` : ''}
+          <div style="font-size:12px;color:var(--muted2)">Your answer: <span style="color:${isCorrect ? 'var(--accent)' : 'var(--danger)'}">${answerToSubmit}</span></div>
+        </div>
+      `;
+      expEl.innerHTML = resultHtml + `<div style="font-size:11px;color:var(--muted2);line-height:1.7;padding:0 2px">${data.explanation}</div>`;
+      expEl.classList.add('show');
+    } else {
+      document.getElementById('mcq-exp').textContent = data.explanation;
+      const correct = data.correct_answer;
+      document.querySelectorAll('.mcq-option').forEach(el => {
+        const lbl = el.id.replace('opt-','');
+        if (lbl === correct) el.classList.add('correct');
+        else if (lbl === selectedOption && !data.correct) el.classList.add('wrong');
+      });
+      document.getElementById('mcq-exp').classList.add('show');
+    }
+
     const btn = document.getElementById('submit-ans-btn');
     btn.style.transition = 'all 0.3s'; btn.style.opacity = '0'; btn.style.transform = 'scale(0.9)';
     setTimeout(() => btn.style.display = 'none', 250);
-    toast(data.correct ? '✓ Correct!' : `✗ Wrong. Correct: ${correct}`, !data.correct);
+    toast(data.correct ? '✓ Correct!' : `✗ Wrong. Correct: ${data.correct_answer}`, !data.correct);
   } catch(err) { toast(err.message, true); }
+}
+
+async function submitShortAnswer(e) {
+
+  const input =
+    document.getElementById(
+      'short-answer-input'
+    );
+
+  const answer =
+    input.value.trim();
+
+  if (!answer) {
+
+    toast(
+      'Enter an answer first',
+      true
+    );
+
+    return;
+  }
+
+  if (currentAnswered) return;
+
+  if (!currentQuestionId) {
+
+    toast(
+      'No question loaded',
+      true
+    );
+
+    return;
+  }
+
+  if (e) burst(e);
+
+  const uid =
+    currentUser?.user_id || 'guest';
+
+  try {
+
+    const data = await api(
+      'POST',
+      '/student/submit',
+      {
+        user_id: uid,
+
+        question_id:
+          currentQuestionId,
+
+        selected_answer:
+          answer
+      }
+    );
+
+    currentAnswered = true;
+
+    const exp =
+      document.getElementById(
+        'short-answer-exp'
+      );
+
+    exp.innerHTML = `
+
+      <strong>
+        ${
+          data.correct
+          ? 'Correct ✅'
+          : 'Incorrect ❌'
+        }
+      </strong>
+
+      <br><br>
+
+      Your Answer:
+      ${data.your_answer}
+
+      <br><br>
+
+      Correct Answer:
+      ${data.correct_answer}
+
+      <br><br>
+
+      ${data.explanation}
+    `;
+
+    exp.classList.add('show');
+
+    toast(
+      data.correct
+      ? '✓ Correct!'
+      : '✗ Incorrect',
+      !data.correct
+    );
+
+  }
+
+  catch(err) {
+
+    toast(err.message, true);
+
+  }
 }
 
 async function loadStudentStats() {
@@ -2209,29 +2520,61 @@ async function loadLogs(type) {
   } catch(err) { toast(err.message, true); }
 }
 
+function setQuestionType(type, el) {
+  document.getElementById('question-type').value = type;
+  currentQuestionType = type;
+  document.querySelectorAll('.qtype-btn').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = 'var(--muted)';
+    b.style.borderBottom = 'none';
+  });
+  el.style.background = 'rgba(0,255,136,0.08)';
+  el.style.color = 'var(--accent)';
+}
+
+function setBulkType(type, el) {
+  document.getElementById('bulk-question-type').value = type;
+  document.querySelectorAll('.bulk-type-btn').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = 'var(--muted)';
+  });
+  el.style.background = 'rgba(0,255,136,0.08)';
+  el.style.color = 'var(--accent)';
+}
+
 async function doBulkGenerate() {
   const topic = document.getElementById('bulk-topic').value.trim();
   const count = parseInt(document.getElementById('bulk-count').value) || 5;
+  const questionType = document.getElementById('bulk-question-type').value;
   if (!topic) { toast('Enter a topic', true); return; }
   const btn = document.getElementById('bulk-btn');
   btn.disabled = true;
   btn.innerHTML = '<span style="display:inline-block;animation:spin 0.7s linear infinite;border:2px solid rgba(0,0,0,0.3);border-top-color:#000;border-radius:50%;width:12px;height:12px"></span> Generating...';
-  document.getElementById('bulk-results').innerHTML = `<div class="loading-state"><div class="spinner"></div><div class="loading-text">Generating ${count} questions...</div></div>`;
+  document.getElementById('bulk-results').innerHTML = `<div class="loading-state"><div class="spinner"></div><div class="loading-text">Generating ${count} ${questionType === 'short_answer' ? 'short answer' : 'MCQ'} questions...</div></div>`;
   try {
-    const data = await api('POST', '/dev/bulk-generate', { topic, count });
+    const data = await api('POST', '/dev/bulk-generate', { topic, count, question_type: questionType });
     let html = `<div class="section-label" style="margin-top:8px">${data.length} Results</div>`;
     data.forEach((item, i) => {
       const passed = item.validation?.passed;
       const reason = item.validation?.failed_check;
+      const isShort = item.type === 'short_answer';
       html += `<div class="card" style="margin-bottom:12px;border-left:3px solid ${passed ? 'var(--accent)' : 'var(--danger)'};animation-delay:${i*40}ms">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">Q${i+1}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">Q${i+1}</span>
+            <span style="font-size:10px;border:1px solid var(--border2);padding:1px 7px;color:var(--muted2);letter-spacing:0.06em;text-transform:uppercase">${isShort ? 'short answer' : 'mcq'}</span>
+          </div>
           <span class="badge ${passed ? 'badge-green' : 'badge-red'}">${passed ? 'valid' : reason || 'invalid'}</span>
         </div>
         <div style="font-size:12px;line-height:1.7;margin-bottom:10px;color:var(--text)">${item.question}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${(item.options||[]).map(o => `<span style="font-size:10px;border:1px solid ${item.correct_answer && o.startsWith(item.correct_answer) ? 'rgba(0,255,136,0.3)' : 'var(--border)'};padding:4px 10px;color:${item.correct_answer && o.startsWith(item.correct_answer) ? 'var(--accent)' : 'var(--muted2)'};background:${item.correct_answer && o.startsWith(item.correct_answer) ? 'rgba(0,255,136,0.05)' : 'transparent'}">${o}</span>`).join('')}
-        </div>
+        ${isShort
+          ? `<div style="font-size:11px;color:var(--muted2);border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+               Answer: <span style="color:${passed ? 'var(--accent)' : 'var(--muted)'}">${item.answer || '—'}</span>
+             </div>`
+          : `<div style="display:flex;flex-wrap:wrap;gap:6px">
+               ${(item.options||[]).map(o => `<span style="font-size:10px;border:1px solid ${item.correct_answer && o.startsWith(item.correct_answer) ? 'rgba(0,255,136,0.3)' : 'var(--border)'};padding:4px 10px;color:${item.correct_answer && o.startsWith(item.correct_answer) ? 'var(--accent)' : 'var(--muted2)'};background:${item.correct_answer && o.startsWith(item.correct_answer) ? 'rgba(0,255,136,0.05)' : 'transparent'}">${o}</span>`).join('')}
+             </div>`
+        }
       </div>`;
     });
     document.getElementById('bulk-results').innerHTML = html;

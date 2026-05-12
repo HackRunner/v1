@@ -2,12 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from app.schemas import TopicRequest
-from app.model import generate_mcq
-from app.utils import extract_json, validate_mcq
-from app.logger import log_entry
 from app.routes import dev, student, teacher, auth
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 load_dotenv()
 

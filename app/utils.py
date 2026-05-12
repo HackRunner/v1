@@ -17,43 +17,46 @@ KEYWORD_MATCH_FRACTION = 2  # divisor: len(keywords) // KEYWORD_MATCH_FRACTION
 
 
 def extract_json(text: str):
+    
     try:
         match = re.search(r"\{.*\}", text, re.DOTALL)
+
         if match:
-            data = json.loads(match.group())
-
-            # Basic validation
-            if not all(key in data for key in ["question", "options", "correct_answer", "explanation"]):
-                raise ValueError("Missing fields")
-
-            if len(data["options"]) != 4:
-                raise ValueError("Options not equal to 4")
-
-            if data["correct_answer"] not in ["A", "B", "C", "D"]:
-                raise ValueError("Invalid correct answer")
-
-            return data
+            return json.loads(match.group())
 
     except Exception:
         pass
 
-    # fallback (important)
-    return {
-        "question": "Invalid question generated",
-        "options": ["A", "B", "C", "D"],
-        "correct_answer": "A",
-        "explanation": "Model output failed validation"
-    }
+    return None
 
 
 def validate_mcq(data: dict) -> tuple[bool, str | None]:
+
+    if data is None:
+        return False, "invalid_json"
+
+    required = [
+        "type",
+        "difficulty",
+        "topic",
+        "question",
+        "options",
+        "correct_answer",
+        "explanation"
+    ]
+
+    for key in required:
+        if key not in data:
+            return False, f"missing_field_{key}"
     """
     Run all validation checks against a parsed MCQ dict.
     Returns (is_valid, reason_string_or_None).
     Order matters: cheap/structural checks run before semantic ones.
     """
-    if data["question"] == "Invalid question generated":
-        return False, "invalid_json"
+    if data["type"] != "mcq":
+        return False, "invalid_type"
+    if data["correct_answer"] not in ["A", "B", "C", "D"]:
+        return False, "invalid_correct_answer"
 
     if not is_quality_question(data):
         return False, "low_quality"
@@ -227,3 +230,38 @@ def has_multiple_correct_options(data):
             return True
 
     return False
+
+
+def validate_short_answer(data):
+    if data is None:
+        return False, "invalid_json"
+    required = [
+        "type",
+        "difficulty",
+        "topic",
+        "question",
+        "answer",
+        "explanation"
+    ]
+
+    for key in required:
+        if key not in data:
+            return False, f"Missing field: {key}"
+
+    if data["type"] != "short_answer":
+        return False, "Invalid type"
+
+    answer_words = len(data["answer"].split())
+    if not data["answer"].strip():
+        return False, "empty_answer"
+
+    if len(data["question"].split()) < 5:
+        return False, "low_quality_question"
+
+    if answer_words > 8:
+        return False, "Answer too long"
+
+    if len(data["explanation"].split()) < 5:
+        return False, "weak_explanation"
+
+    return True, None
